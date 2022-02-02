@@ -82,9 +82,8 @@ def handler(tick_raw):
         writer.writerow(data)
 
         for row in data:
-            writer.writerow(row)
-            print(row)
-            row += 1
+            writer.writerow(data[row])
+            print(data[row])
 
 
 
