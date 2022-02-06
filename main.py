@@ -1,124 +1,49 @@
-from locale import currency
-from operator import index
+from multiprocessing import connection
 import time
-from luno_python.client import Client
 import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import csv
+import csv, json
+from luno_python.client import Client as luno_client
 
 
-# ****************************************************************************************
-
-# *********************************Variables**********************************************
-
-# ****************************************************************************************
 # Variables for strategy
 currency_pair = 'ETHUSDC'
-tick_ = 1 # <----- The tick interfal in seconds
-data_field = 10 # <----- The amount of rows to track for each second# Luno API Key
+tick_ = 0.2 # <----- The tick interfal in seconds
+data_field = 60 # <----- The amount of rows to track and also the divider | This should be 60, unless debugging
 
-# API Key & Secret
-secret = 'ilkbZ6RQVQee11g_6KT7-jEOSN7pCbJoq09YWVSOmvw'
-key = 'ebb7ge7q6u6dp'
-
-# Looping variables
+# Looping Values
 exit = False
-initialized = False
 
-# Create containers for price data
-asks = []
-bids = []
-price_aim = []
-average_ask = []
-average_bid = []
-high_ask = []
-low_ask = []
-high_bid = []
-low_bid = []
-time_string = []
-sma = []
-sma_price_diff = []
-
-# Test Variable of Momentum
-momentum = []
-
-
-# ******************************************************************************************
+# User Login Details
+f = open('user.json', "r")
+raw = f.read()
+user = json.loads(raw)
 
 
 
-
-def handler(tick_raw):
-    # Sets current moment of time to var
-    now = datetime.datetime.now().strftime('%H:%M | %S')
-
-    # Add current values to containers
-    asks.append(round(float(tick_raw['ask'])))
-    bids.append(round(float(tick_raw['bid'])))
-    average_ask.append(int(sum(asks) / len(asks)))
-    average_bid.append(int(sum(bids) / len(bids)))
-    high_ask.append(max(asks))
-    low_ask.append(min(asks))
-    high_bid.append(max(bids))
-    low_bid.append(min(bids))
-    time_string.append(now)
-    price_aim.append((float(tick_raw['ask'])+float(tick_raw['bid']))/2)
-    sma.append(sum(price_aim) / len(price_aim))
-
-
-
-
-    # Set live data into datafield, wel ..frame
-    matrix = pd.DataFrame(
-            [price_aim, sma, asks, bids, average_ask, average_bid, high_ask, low_ask, high_bid, low_bid],
-            index=['price', 'sma', 'asks', 'bids', 'average_ask', 'average_bid', 'high_ask', 'low_ask', 'high_bid', 'low_bid'],
-            columns=time_string
-        )
-        
-
-    sma_last_tick = matrix.loc['sma'][-1] 
-    price_last_tick = matrix.loc['price'][-1]
-    
-    
-    if sma_last_tick > price_last_tick:
-        # Run if Price is less than Average
-        sma_price_diff = sma_last_tick - price_last_tick
-        momentum.append(-sma_price_diff)
-        print('\nAverage is above with: ', sma_price_diff)
-    elif price_last_tick > sma_last_tick:
-        # Run if Price is Above Average
-        sma_price_diff = price_last_tick - sma_last_tick
-        momentum.append(sma_price_diff)
-        print('\nPrice is above with: ', sma_price_diff)
-    
-    print('The momentum is: ',sum(momentum)/len(momentum))
-
-
- 
-    
-    # Plot data to graph
-    print(len(time_string))
-    if len(time_string) > 120:
-        ax = plt.gca()
-
-        matrix.loc['sma'].plot(kind='line',x='sma',y='time_string', color='blue',ax=ax)
-        matrix.loc['price'].plot(kind='line',x='price',y='time_string', color='green', ax=ax)
-        
-
-        plt.show()
-
-    
-
-
-
+# Data Containers
+time_data_sec = []
+data_minute = {
+    "prices": [],
+    'sma': []
+}
+data_hour = {
+    "time": [],
+    "open_price": [],
+    'close_price': [],
+    'high_price': [],
+    'low_price': []
+}
 
 # Main Function Declaration
 def main():
     # Create a socket
-    connection = Client(api_key_id=key, api_key_secret=secret)
+    connection = luno_client(api_key_id=user['key'], api_key_secret=user['secret'])
     
+    # Duration of session
+    duration = int(0)
 
     # Start the main loop
     while exit == False:
@@ -127,13 +52,63 @@ def main():
         try:
             # Get the tick data from API socket
             ticker = connection.get_ticker(pair=currency_pair)
+            # Get the current time
+            now = datetime.datetime.now().strftime('%H:%M:%S -> ')        
 
-            # Get Markets Data
-            # market_df = connection.markets()
-            # print(market_df)
-            
-            # Send the tick data to the handler
-            handler(ticker)
+            # Build Data Sets
+            time_data_sec.append(now)
+            data_minute['prices'].append((float(ticker['ask'])+float(ticker['bid']))/2)
+            data_minute['sma'].append(sum(data_minute['prices'])/len(data_minute['prices']))
+
+
+
+            if int(len(time_data_sec)) > data_field:
+                # Runs after first passed minute
+
+                # Pop the List to keep values below data_field
+                data_minute['prices'].pop(0)
+                data_minute['sma'].pop(0)
+                time_data_sec.pop(0)
+
+
+                # Create a data Frame For Current Minutes
+                # df_min = pd.DataFrame(data_minute, columns = ['prices', 'sma'], index = time_data_sec)
+                
+                
+
+                if duration % data_field == 0:
+                    # Runs if a minute has passed
+
+                    # Prints The last two lines of minute timeframe
+                    # print(df_min.tail(2))
+                    
+                    if len(data_hour['time']) > 60:
+                        data_hour['time'].pop(0)
+                        data_hour['open_price'].pop(0)
+                        data_hour['close_price'].pop(0)
+                        data_hour['high_price'].pop(0)
+                        data_hour['low_price'].pop(0)
+                    else:
+                        print('Still Building data for hour frame..', duration, ' out of 3600')
+
+                    data_hour['time'].append(now)
+                    data_hour['open_price'].append(data_minute['prices'][0])
+                    data_hour['close_price'].append(data_minute['prices'][-1])
+                    data_hour['high_price'].append(max(data_minute['prices']))
+                    data_hour['low_price'].append(min(data_minute['prices']))
+
+                    # Create a data Frame for Hour
+                    df_hour = pd.DataFrame(data_hour, columns = ['open_price', 'close_price', 'high_price', 'low_price'], index = data_hour['time'])
+                    print(df_hour)
+
+                    
+                # else:
+                #     # Still initializing Starting Data
+                #  
+
+            # else:
+            #     # Still initializing Starting Data
+            #     
 
 
 
@@ -142,13 +117,12 @@ def main():
         except Exception as e:
             print(e)
 
+        # Increase the Duration of session
+        duration += 1
+
         # Wait for the next tick period
         time.sleep(tick_)
-
-
 
 # Execute the main function
 if __name__ == '__main__':
     main()
-
-
