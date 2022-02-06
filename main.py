@@ -99,14 +99,15 @@ def handler(tick_raw):
  
     
     # Plot data to graph
-    # if len(time_string) > 60:
-    #     ax = plt.gca()
+    print(len(time_string))
+    if len(time_string) > 120:
+        ax = plt.gca()
 
-    #     matrix.plot(kind='line',x='sma',y='time_string', color='blue',ax=ax)
-    #     matrix.plot(kind='line',x='price',y='time_string', color='green', ax=ax)
+        matrix.loc['sma'].plot(kind='line',x='sma',y='time_string', color='blue',ax=ax)
+        matrix.loc['price'].plot(kind='line',x='price',y='time_string', color='green', ax=ax)
         
 
-    #     plt.show()
+        plt.show()
 
     
 
