@@ -100,7 +100,7 @@ def handler(tick_raw):
     
     # Plot data to graph
     print(len(time_string))
-    if len(time_string) > 120:
+    if len(time_string) > 60:
         ax = plt.gca()
 
         matrix.loc['sma'].plot(kind='line',x='sma',y='time_string', color='blue',ax=ax)
